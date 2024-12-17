@@ -15,6 +15,8 @@ import AdminPostDetails from './admin/pages/post-details';
 import Sidebar from './user/components/sidebar';
 import Elements from './user/pages/elements';
 import PostDetails from './user/pages/post-details';
+import Feature from './user/pages/feature';
+import AllUserShown from './admin/pages/user.page';
 
 export const UserContext = createContext({});
 export const AdminContext = createContext({});
@@ -38,12 +40,14 @@ function App() {
       <Route path='/profile/:id' element={<ProfilePage/>}/>
       <Route path='/create' element={<CreatePostPage/>}/>
       <Route path={'/:category'} element={<Elements />}/>
-      <Route path='posts/:username/:postId' element={<PostDetails/>}/>
+      <Route path='/:username/:postId' element={<PostDetails/>}/>
+      <Route path='/feature' element={<Feature/>}/>
       </Route>
       <Route path='/admin-auth' element={<AdminHome/>}/>
       <Route path='/admin/' element={<AdminSidebar/>}>
       <Route path='dashboard' element={<AdminDashboard/>}/>
       <Route path='posts' element={<AdminPost/>}/>
+      <Route path='users' element={<AllUserShown/>}/>
       <Route path='posts/:username/:postId' element={<AdminPostDetails/>}/>
       </Route>
     </Routes>

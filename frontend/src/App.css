@@ -105,3 +105,23 @@ body {
   }
 }
 
+
+.scroll-container {
+  display: flex;
+  width: max-content; /* Allows the container to stretch based on content */
+  animation: scroll-left 10s linear infinite; /* Scrolling animation */
+}
+
+/* Stop animation on hover */
+.scroll-container:hover {
+  animation-play-state: paused;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-100% + 100vw)); /* Scroll through all posts */
+  }
+}

@@ -3,44 +3,38 @@ import mongoose, { Schema } from "mongoose";
 const notificationSchema = mongoose.Schema({
     type: {
         type: String,
-        enum: ["like", "comment", "reply"],
+        enum: ["post_published", "blog_published", "post_rejected", "blog_rejected", "comment", "post_save", "other"],
         required: true
+    },
+    post: {
+        type: Schema.Types.ObjectId,
+        ref: 'posts'
     },
     blog: {
         type: Schema.Types.ObjectId,
-        required: true,
-        ref: 'posts'
+        ref: 'blogs'
     },
     notification_for: {
         type: Schema.Types.ObjectId,
         required: true,
         ref: 'users'
     },
-    user: {
+    user:{
         type: Schema.Types.ObjectId,
-        required: true,
         ref: 'users'
     },
-    comment: {
-        type: Schema.Types.ObjectId,
-        ref: 'comments'
-    },
-    reply: {
-        type: Schema.Types.ObjectId,
-        ref: 'comments'
-    }, 
-    replied_on_comment:{
-        type: Schema.Types.ObjectId,
-        ref: 'comments'
+    message: {
+        type: "String",
+        required: true,
     },
     seen: {
         type: Boolean,
         default: false
     }
 },
-{
-    timestamps: true
-}
+    {
+        timestamps: true
+    }
 )
 
 export default mongoose.model("notification", notificationSchema)

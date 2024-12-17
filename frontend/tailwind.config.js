@@ -7,7 +7,9 @@ module.exports = {
         'custom-gradient': 'linear-gradient(45deg, purple, rgb(7, 89, 89))',
       },
       
+      
     },
   },
+  
   plugins: [],
 }

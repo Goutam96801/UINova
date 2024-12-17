@@ -57,20 +57,20 @@ export default function AdminPost() {
 
   return (
     <>
-      <div className="bg-dark-700 mx-auto p-4 h-[100vh] w-[100vw] md:w-[calc(100vw-250px)] overflow-y-auto">
-        <LoadingBar
-          color="red"
-          progress={progress}
-          onLoaderFinished={() => setProgress(0)}
-        />
+     <div className=" w-[calc(100vw-250px)] min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-8">
+     <LoadingBar
+        color="#7781b7"
+        progress={progress}
+        onLoaderFinished={() => setProgress(0)}
+      />
         <h1 className="text-2xl font-bold mb-4">User Posts</h1>
         <div className="flex border-b border-gray-600">
           <nav className="flex gap-1">
             <button
               className={`py-2 px-4 text-center text-yellow-500 font-medium text-base flex gap-2 duration-300 rounded ${
                 activeTab === "under review"
-                  ? "bg-[#212121]"
-                  : "  hover:bg-[#212121]"
+                  ? "bg-gray-800"
+                  : "  hover:bg-gray-900"
               }`}
               onClick={() => setActiveTab("under review")}
             >
@@ -80,8 +80,8 @@ export default function AdminPost() {
             <button
               className={` py-2 px-4 text-center text-green-500 font-medium text-base rounded flex gap-2 duration-300 ${
                 activeTab === "published"
-                  ? "bg-[#212121]"
-                  : "  hover:bg-[#212121]"
+                 ? "bg-gray-800"
+                  : "  hover:bg-gray-900"
               }`}
               onClick={() => setActiveTab("published")}
             >
@@ -91,8 +91,8 @@ export default function AdminPost() {
             <button
               className={` py-2 px-4 text-center text-red-500 font-medium text-base rounded flex gap-2 duration-300 ${
                 activeTab === "rejected"
-                  ? "bg-[#212121]"
-                  : "  hover:bg-[#212121]"
+                 ? "bg-gray-800"
+                  : "  hover:bg-gray-900"
               }`}
               onClick={() => setActiveTab("rejected")}
             >

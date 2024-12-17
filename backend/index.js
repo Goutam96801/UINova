@@ -9,6 +9,8 @@ import { getAuth } from 'firebase-admin/auth';
 import User from './model/User.js';
 import Post from './model/Post.js';
 import Admin from './model/Admin.js';
+import Comment from './model/comment.js';
+import Notification from './model/notification.js';
 import { nanoid } from 'nanoid';
 
 const app = express();
@@ -47,7 +49,7 @@ const formatDatatoSend = (user) => {
         email: user.personal_info.email,
         profile_img: user.personal_info.profile_img,
         username: user.personal_info.username,
-        userId:user._id,
+        userId: user._id,
         contributor_points: user.account_info.contributor_points,
     }
 }
@@ -79,6 +81,27 @@ const verifyJWT = (req, res, next) => {
         next();
     });
 }
+
+// Helper function for creating notifications
+const createNotification = async ({ type, message, post, user, notificationFor }) => {
+    try {
+        const notificationObj = {
+            type,
+            message,
+            post,
+            notification_for: notificationFor,
+            user,
+            timestamp: new Date(),
+        };
+        const notification = await new Notification(notificationObj).save();
+        await User.findByIdAndUpdate(notificationFor, {
+            $push: { notification: notification._id },
+        });
+    } catch (err) {
+        console.error("Error creating notification:", err);
+        throw new Error("Notification creation failed");
+    }
+};
 
 app.post("/google-auth", async (req, res) => {
     const { access_token } = req.body;
@@ -116,9 +139,9 @@ app.post("/google-auth", async (req, res) => {
         }
         return res.status(200).json(formatDatatoSend(user));
     })
-    .catch((err) => {
-        return res.status(500).json({ error: "Failed to authenticate you with Google. Try with another account", err });
-    });
+        .catch((err) => {
+            return res.status(500).json({ error: "Failed to authenticate you with Google. Try with another account", err });
+        });
 });
 
 
@@ -135,7 +158,7 @@ app.post("/get-profile", async (req, res) => {
         })
 })
 
-app.get("/logged-user", verifyJWT, async(req, res) => {
+app.get("/logged-user", verifyJWT, async (req, res) => {
     let userId = req.user;
 
     await User.findById(userId).then((user) => {
@@ -223,7 +246,53 @@ app.post("/create-post", verifyJWT, async (req, res) => {
     })
 })
 
-// Get All post
+app.post("/trending-post", async (req, res) => {
+    Post.find({ status: 'published' }).populate("user", "personal_info.username personal_info.profile_img -_id")
+        .sort({
+            "activity.total_saves": -1,
+            "activity.total_views": -1,
+            "activity.total_comments": -1,
+            publishedAt: -1
+        }).select("postId htmlCode cssCode category tags activity.total_views activity.total_saves activity.total_comments theme createdAt _id")
+        .limit(15).then((posts) => {
+            return res.status(200).json({ posts });
+        }).catch((err) => {
+            return res.status(500).json({ error: err.message });
+        })
+})
+
+app.post("/top-post-from-last-week", async (req, res) => {
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    Post.find({ status: 'published', publishedAt: { $gte: sevenDaysAgo } }).populate("user", "personal_info.username personal_info.profile_img -_id")
+        .sort({
+            "activity.total_saves": -1,
+            "activity.total_views": -1,
+            "activity.total_comments": -1,
+            publishedAt: -1
+        }).select("postId htmlCode cssCode category tags activity.total_views activity.total_saves activity.total_comments theme createdAt _id")
+        .limit(15).then((posts) => {
+            return res.status(200).json({ posts });
+        }).catch((err) => {
+            return res.status(500).json({ error: err.message });
+        })
+})
+
+app.post("/top-creators", async (req, res) => {
+    User.find().sort({
+        "account_info.contributor_points": -1,
+        "account_info.total_views": -1,
+        "account_info.total_posts": -1,
+        "account_info.total_blogs": -1
+    }).select("personal_info.username personal_info.profile_img account_info.total_posts account_info.contributor_points")
+        .limit(9).then((users) => {
+            return res.status(200).json({ users })
+        }).catch((err) => {
+            return res.status(500).json({ error: err.message });
+        })
+})
 
 app.post('/explore-post', async (req, res) => {
     let { query, category, page, limit, theme, sort } = req.body;
@@ -253,7 +322,7 @@ app.post('/explore-post', async (req, res) => {
     Post.find(findQuery)
         .populate('user', 'personal_info.username personal_info.profile_img -_id')
         .sort({ [sort]: -1 })
-        .select('postId htmlCode cssCode category tags views saved theme createdAt _id')
+        .select('postId htmlCode cssCode category tags activity.total_views activity.total_saves activity.total_comments theme createdAt _id')
         .skip((page - 1) * maxLimit)
         .limit(maxLimit)
         .then(posts => {
@@ -298,12 +367,28 @@ app.post('/explore-post-count', async (req, res) => {
         })
 })
 
+app.post('/post-counts', async (req, res) => {
+    const { categories } = req.body; // Expecting an array of categories
+    try {
+        const counts = await Promise.all(
+            categories.map(async (category) => {
+                const count = await Post.countDocuments(category === "all" ? {} : { category });
+                return { category, count };
+            })
+        );
+        return res.status(200).json(counts);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+
 app.post('/get-post', async (req, res) => {
     let { postId } = req.body;
     let incrementVal = 1;
 
     await Post.findOneAndUpdate({ status: "published", "postId": postId }, { $inc: { "views": incrementVal } })
-        .populate("user", "personal_info.username personal_info.profile_img -_id")
+        .populate("user", "personal_info.username personal_info.profile_img personal_info.fullname _id")
         .then((result) => {
             return res.status(200).json({ result })
         }).catch(err => {
@@ -314,47 +399,305 @@ app.post('/get-post', async (req, res) => {
 app.post('/toggle-save-post', verifyJWT, async (req, res) => {
     const { postId } = req.body;
     const userId = req.user;
-  
-    try {
-      // Find the post and user by ID
-      const post = await Post.findById(postId);
-      const user = await User.findById(userId);
-  
-      if (!post || !user) {
-        return res.status(404).json({ message: "User or Post not found" });
-      }
-  
-      const isSaved = user.saved_post.includes(postId);
-  
-      if (isSaved) {
-        user.saved_post = user.saved_post.filter(id => id.toString() !== postId);
-        post.user_saved = post.user_saved.filter(id => id.toString() !== userId);
-        post.saved -= 1;
-      } else {
-        user.saved_post.push(postId);
-        post.user_saved.push(userId);
-        post.saved += 1;
-      }
-  
-      // Save the changes to the database
-      await user.save();
-      await post.save();
-  
-      // Return the updated save status
-      res.status(200).json({ isSaved: !isSaved, message: isSaved ? "Post unsaved" : "Post saved" });
-    } catch (error) {
-      console.error("Error toggling save status:", error);
-      res.status(500).json({ message: "Failed to toggle save status" });
-    }
-  });
-  
 
+    try {
+        const [post, user] = await Promise.all([
+            Post.findById(postId),
+            User.findById(userId),
+        ]);
+
+        if (!post || !user) {
+            return res.status(404).json({ message: "User or Post not found" });
+        }
+
+        const previouslySaved = await Notification.findOne({ message: `Your post \"${post.postId}\" has been saved by ${user.personal_info.username}. 10 contribution points has been added to your account. Thank you!` })
+
+        const isSaved = user.saved_post.includes(postId);
+
+        if (!isSaved) {
+            user.saved_post.push(postId);
+            post.user_saved.push(userId);
+            post.saved += 1;
+            if (!previouslySaved) {
+                await createNotification({
+                    type: "post_save",
+                    message: `Your post \"${post.postId}\" has been saved by ${user.personal_info.username}. 10 contribution points has been added to your account. Thank you!`,
+                    post: post._id,
+                    user: userId,
+                    notificationFor: post.user,
+                })
+                await User.findOneAndUpdate({ _id: post.user }, { $inc: { "account_info.contributor_points": 10 } })
+            }
+
+        } else {
+            user.saved_post = user.saved_post.filter(id => id.toString() !== postId);
+            post.user_saved = post.user_saved.filter(id => id.toString() !== userId);
+            post.saved -= 1;
+        }
+
+        await Promise.all([user.save(), post.save()]);
+
+        // Return the updated save status
+        res.status(200).json({ isSaved: !isSaved, message: isSaved ? "Post unsaved" : "Post saved" });
+    } catch (error) {
+        console.error("Error toggling save status:", error);
+        res.status(500).json({ message: "Failed to toggle save status" });
+    }
+});
+
+app.post("/add-comment", verifyJWT, async (req, res) => {
+    let user_id = req.user;
+
+    let { _id, comment, post_author, replying_to } = req.body;
+
+    if (!comment || !comment.trim()) {
+        return res.status(400).json({ error: "Write something to leave a comment" });
+    }
+
+    try {
+        const [user, post] = await Promise.all([
+            User.findById(user_id),
+            Post.findById(_id),
+        ]);
+
+        if (!post || !user) {
+            return res.status(404).json({ message: "User or Post not found" });
+        }
+
+
+        let commentObj = {
+            post_id: _id,
+            post_author,
+            comment,
+            commented_by: user_id,
+            parent: replying_to || null,
+            isReply: !!replying_to,
+        };
+
+        const newComment = await new Comment(commentObj).save();
+
+        post.comments.push(newComment._id);
+        post.activity.total_comments += 1;
+        if (!replying_to) post.activity.total_parent_comments += 1;
+        await post.save();
+
+        if (replying_to) {
+            await Comment.findByIdAndUpdate(replying_to, {
+                $push: { children: newComment._id },
+            });
+        }
+        await createNotification({
+            type: "comment",
+            message: `${user.personal_info.username} commented on your post ${post.postId}. Thank you!`,
+            post: _id,
+            user: user_id,
+            notificationFor: post.user,
+        });
+
+        res.status(200).json({
+            comment: newComment.comment,
+            commentedAt: newComment.commentedAt,
+            _id: newComment._id,
+            user_id: user_id,
+            children: newComment.children,
+        });
+
+    } catch (error) {
+        console.error("Error adding comment:", error);
+        res.status(500).json({ message: "Failed to add comment" });
+    }
+
+});
+
+app.post("/get-post-comments", (req, res) => {
+    let { post_id } = req.body;
+
+    Comment.find({ post_id, isReply: false })
+        .populate(
+            "commented_by",
+            "personal_info.username personal_info.fullname personal_info.profile_img"
+        )
+        .sort({
+            commentedAt: -1,
+        })
+        .then((comment) => {
+            return res.status(200).json(comment);
+        })
+        .catch((err) => {
+            console.log(err.message);
+            return res.status(500).json({ error: err.message });
+        });
+});
+
+app.post("/get-replies", (req, res) => {
+    let { _id, skip } = req.body;
+
+    Comment.findOne({ _id })
+        .populate({
+            path: "children",
+            options: {
+                sort: { commentedAt: -1 },
+            },
+            populate: {
+                path: "commented_by",
+                select:
+                    "personal_info.profile_img personal_info.fullname personal_info.username",
+            },
+            select: "-post_id -updatedAt",
+        })
+        .select("children")
+        .then((doc) => {
+            return res.status(200).json({ replies: doc.children });
+        })
+        .catch((err) => {
+            return res.status(500).json({ error: err.message });
+        });
+});
+
+const deleteComments = (_id) => {
+    Comment.findOneAndDelete({ _id })
+        .then((comment) => {
+            if (comment.parent) {
+                Comment.findOneAndUpdate(
+                    { _id: comment.parent },
+                    { $pull: { children: _id } }
+                )
+                    .then((data) => console.log("comment delete from parent"))
+                    .catch((err) => console.log(err));
+            }
+
+            Notification.findOneAndDelete({ comment: _id }).then((notification) =>
+                console.log("comment notification deleted")
+            );
+
+            Notification.findOneAndUpdate(
+                { reply: _id },
+                { $unset: { reply: 1 } }
+            ).then((notification) => console.log("reply notification deleted"));
+
+            Post.findOneAndUpdate(
+                { _id: comment.post_id },
+                {
+                    $pull: { comments: _id },
+                    $inc: { "activity.total_comments": -1 },
+                    "activity.total_parent_comments": comment.parent ? 0 : -1,
+                }
+            ).then((post) => {
+                if (comment.children.length) {
+                    comment.children.map((replies) => {
+                        deleteComments(replies);
+                    });
+                }
+            });
+        })
+        .catch((err) => {
+            console.log(err.message);
+        });
+};
+
+app.post("/delete-comment", verifyJWT, (req, res) => {
+    let user_id = req.user;
+
+    let { _id } = req.body;
+
+    Comment.findOne({ _id }).then((comment) => {
+        if (user_id == comment.commented_by || user_id == comment.post_author) {
+            deleteComments(_id);
+
+            return res.status(200).json({ status: "done" });
+        } else {
+            return res.status(403).json({ error: "You can not delete the comment" });
+        }
+    });
+});
+
+app.post("/report-post", verifyJWT, async (req, res) => {
+
+    let user_id = req.user;
+    const { message, additionalMessage, post_id } = req.body;
+
+    if (!message) {
+        return res.status(400).json({ error: "Please select or write something to report this post." })
+    }
+
+    try {
+        const post = await Post.findOne({ postId: post_id });
+
+        const alreadyReported = post.reports.some(report => report.user.toString() === user_id);
+
+        if (alreadyReported) {
+            return res.status(400).json({ error: "You have already reported this post" })
+        }
+
+        post.reports.push({
+            user: user_id,
+            message,
+            additionalMessage
+        });
+
+        await post.save();
+
+        return res.status(200).json({ message: "Reported Successfully." });
+    } catch (error) {
+        return res.status(500).json({ error: "Internal server error", error })
+    }
+})
+
+app.post("/notifications", verifyJWT, async (req, res) => {
+    let user_id = req.user;
+    const { skip = 0, limit = 5 } = req.body;
+
+    try {
+        const findQuery = { notification_for: user_id };
+
+        const notification = await Notification.find(findQuery).populate("post", "postId")
+            .populate("user", "personal_info.username personal_info.profile_img")
+            .populate("notification_for", "personal_info.username")
+            .populate("blog", "blog_id")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .select("createdAt type seen message");
+
+        return res.status(200).json({ notification })
+
+    } catch (error) {
+        console.error("Error fetching notifications:", err.message);
+        return res.status(500).json({ error: err.message });
+    }
+})
+
+app.post("/mark-all-notifications-as-read", verifyJWT, async (req, res) => {
+    const user_id = req.user;
+    try {
+        const findQuery = { notification_for: user_id, seen: true };
+        await Notification.updateMany(findQuery);
+        return res.status(200).json({ message: "All notifications marked as read" });
+    } catch (err) {
+        console.error("Error marking notifications as read:", err);
+        return res.status(500).json({ error: err });
+    }
+});
+
+app.post("/all-unread-notifications-count", verifyJWT, async (req, res) => {
+    const user_id = req.user;
+
+    try {
+        const findQuery = { notification_for: user_id, seen: false };
+
+        // Count total notifications
+        const totalDocs = await Notification.countDocuments(findQuery);
+        return res.status(200).json({ totalDocs });
+    } catch (err) {
+        console.error("Error fetching notifications count:", err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 // Admin Routes
 // Login & Signup
 
 // Admin Signup route
-
 
 app.post("/admin/google-auth", async (req, res) => {
     const { access_token } = req.body;
@@ -433,10 +776,11 @@ app.post('/admin/get-post', verifyJWT, async (req, res) => {
 
 app.post('/admin/update-post', verifyJWT, async (req, res) => {
 
-    let { postId, status, tags } = req.body;
+    const { postId, status, tags } = req.body;
+    const adminId = req.user;
 
     try {
-        const admin = await Admin.findById(req.user);
+        const admin = await Admin.findById(adminId);
 
         if (!admin || !admin.personal_info.isVerified) {
             return res.status(403).json({ error: "Access denied" });
@@ -450,8 +794,17 @@ app.post('/admin/update-post', verifyJWT, async (req, res) => {
 
         if (!post) return res.status(404).json({ error: "Post not found" });
 
-        const user = await User.findOne({_id:post.user})
-        // Update admin counts based on post status
+        const user = await User.findOne(post.user)
+
+        await createNotification({
+            type: `post_${status}`,
+            message: `Your post \"${post.postId}\" has been ${status}. ${status === 'published' ? '100 contribution points have been added to your account. Thank you!' : ''}`,
+            post: post._id,
+            user: adminId,
+            notificationFor: post.user,
+        });
+
+
         if (status === 'published') {
             admin.account_info.total_post_published += 1;
             admin.post_published.push(post._id);
@@ -462,14 +815,23 @@ app.post('/admin/update-post', verifyJWT, async (req, res) => {
             admin.post_rejected.push(post._id);
         }
 
-        await admin.save();
-        await user.save();
+        await Promise.all([admin.save(), user.save()]);
 
-        return res.status(200).json({ message: "Post updated successfully", post });
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
+        res.status(200).json({ message: "Post updated successfully", post });
+    } catch (error) {
+        console.error("Error updating post:", error);
+        res.status(500).json({ message: "Failed to update post" });
     }
 
+})
+
+app.post("/get-all-user", verifyJWT, async (req, res) => {
+
+    await User.find().then((user) => {
+        return res.status(200).json({ user });
+    }).catch(err => {
+        return res.status(401).json({ error: "Unauthorized" });
+    })
 })
 
 app.listen(PORT, () => {

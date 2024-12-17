@@ -45,7 +45,7 @@ export default function Sidebar({ isOpen }) {
   return (
    <div className="relative h-full overflow-hidden">
       <nav
-        className="h-full overflow-auto custom-scrollbar-transparent"
+        className="h-[50%] overflow-auto custom-scrollbar-transparent"
         role="navigation"
         aria-label="Main navigation"
       >
@@ -55,7 +55,7 @@ export default function Sidebar({ isOpen }) {
             <NavLink
               key={name}
               to={name === "all" ? "/elements" : `/${name}`}
-              className={`mb-1 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-normal tracking-wide transition-colors hover:bg-[#212121] text-white"
+              className={`mb-1 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-normal tracking-wide transition-colors hover:bg-[rgb(33,33,33)] text-white"
                   `}
             >
               <div className="flex items-center gap-3 ">

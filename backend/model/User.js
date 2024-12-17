@@ -57,6 +57,10 @@ const userSchema = mongoose.Schema({
         contributor_points:{
             type:Number,
             default:0
+        },
+        total_views:{
+            type:Number,
+            default:0
         }
     },
     posts: {
@@ -74,6 +78,11 @@ const userSchema = mongoose.Schema({
         ref: 'posts',
         default: []
     },
+    notification:{
+        type:[Schema.Types.ObjectId],
+        ref:'notification',
+        default:[]
+    }
 },
 {
     timestamps:{

@@ -3,11 +3,14 @@ import {
   Ban,
   Bookmark,
   BookMarked,
+  Calendar,
   Check,
   CheckIcon,
   Clipboard,
   Moon,
   MoveLeft,
+  Scale,
+  ShieldAlert,
   Sun,
   UserRound,
 } from "lucide-react";
@@ -21,25 +24,28 @@ import axios from "axios";
 import { UserContext } from "../../App";
 import Sidebar from "../components/sidebar";
 import ClipLoader from "react-spinners/ClipLoader";
+import { getDay, getFullDay } from "../../common/date";
+import Comments from "../components/comments";
+import ReportModal from "../components/report-modal";
 
 export const postDataStructure = {
+  _id: "",
   category: "",
   createdAt: "",
   cssCode: "",
-  theme:"",
+  theme: "",
   htmlCode: "",
   postId: "",
   views: 0,
   saved: 0,
   status: "",
   tags: [],
-  updatedAt: "",
+  publishedAt: "",
   user: { personal_info: {} },
 };
 
 function PostDetails() {
   const navigate = useNavigate();
-  const { postId } = useParams();
   const [user, setUser] = useState(null);
   const [post, setPost] = useState(postDataStructure);
   const [activeTab, setActiveTab] = useState("html");
@@ -50,6 +56,8 @@ function PostDetails() {
   const editorRef = useRef(null);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [reportModal, setReportModal] = useState(false);
+  let {postId} = useParams();
 
   const handleEditorDidMount = (editor) => {
     editorRef.current = editor;
@@ -60,20 +68,21 @@ function PostDetails() {
   } = useContext(UserContext);
 
   let {
+    _id,
     category,
     htmlCode,
     cssCode,
-    updatedAt,
     views,
     theme,
+    tags,
     user: {
-      personal_info: { username, profile_img },
+      personal_info: { username, profile_img, fullname },
     },
-    createdAt,
+    publishedAt,
   } = post;
 
   const fetchPostDetails = () => {
-    setLoading(true); 
+    setLoading(true);
 
     axios
       .post(
@@ -95,28 +104,32 @@ function PostDetails() {
       });
   };
 
-  const [backgroundColor, setBackgroundColor] = useState(theme === 'light' ? '#e8e8e8' : '#212121');
-  
+  const [backgroundColor, setBackgroundColor] = useState(
+    theme === "light" ? "#e8e8e8" : "#212121"
+  );
+
   const [isDarkMode, setIsDarkMode] = useState(theme === "dark");
 
   const fetchLoggedUser = async () => {
-
-    if(access_token){
-    await axios.get(process.env.REACT_APP_SERVER_DOMAIN + "/logged-user", {
-      headers:{
-        Authorization:`Bearer ${access_token}`
-      }
-    }).then(({data}) => { 
-      setUser(data);
-    }).catch(err => {
-      console.log(err);
-    })
-  }
-  }
+    if (access_token) {
+      await axios
+        .get(process.env.REACT_APP_SERVER_DOMAIN + "/logged-user", {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        })
+        .then(({ data }) => {
+          setUser(data);
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    }
+  };
 
   useEffect(() => {
-    fetchLoggedUser()
-  }, [access_token]) 
+    fetchLoggedUser();
+  }, [access_token]);
 
   useEffect(() => {
     if (user && Array.isArray(user.saved_post)) {
@@ -124,36 +137,36 @@ function PostDetails() {
     }
   }, [post._id, user]);
 
-
   const toggleSave = async () => {
     setLoading(true);
     if (!user) {
-      alert('Please log in to save the post');
+      alert("Please log in to save the post");
       return;
     }
     await axios
-      .post(process.env.REACT_APP_SERVER_DOMAIN + '/toggle-save-post', { postId: post._id }, {
-        headers:{
-          Authorization: `Bearer ${access_token}`
+      .post(
+        process.env.REACT_APP_SERVER_DOMAIN + "/toggle-save-post",
+        { postId: post._id },
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
         }
-      })
+      )
       .then((response) => {
         setIsSaved(response.data.isSaved);
-        post.saved = response.data.isSaved ? post.saved + 1 : post.saved - 1; 
+        post.saved = response.data.isSaved ? post.saved + 1 : post.saved - 1;
         setLoading(false);
       })
       .catch((error) => {
-        console.error('Error toggling save status:', error);
+        console.error("Error toggling save status:", error);
         setLoading(false);
       });
   };
 
-
   useEffect(() => {
     fetchPostDetails();
   }, [postId]);
-
-
 
   const handleHtmlChange = (newValue) => {
     setPost((prevPost) => ({
@@ -161,19 +174,19 @@ function PostDetails() {
       htmlCode: newValue,
     }));
   };
-  
+
   const handleCssChange = (newValue) => {
     setPost((prevPost) => ({
       ...prevPost,
       cssCode: newValue,
     }));
   };
-  
+
   useEffect(() => {
     if (previewRef.current && !shadowRootRef.current) {
       shadowRootRef.current = previewRef.current.attachShadow({ mode: "open" });
     }
-  
+
     if (shadowRootRef.current) {
       // Update shadow root content when HTML or CSS changes
       shadowRootRef.current.innerHTML = `
@@ -190,8 +203,6 @@ function PostDetails() {
       `;
     }
   }, [post.htmlCode, post.cssCode, backgroundColor, isDarkMode]);
-
-
 
   const handleGoBack = () => {
     setProgress(70);
@@ -248,6 +259,10 @@ function PostDetails() {
   // Determine text color based on luminance
   const textColor = getLuminance(backgroundColor) < 0.5 ? "white" : "black";
 
+  const handleCloseBtn = () => {
+    setReportModal(false);
+  }
+
   return (
     <AnimationWrapper>
       <Toaster />
@@ -256,18 +271,19 @@ function PostDetails() {
         progress={progress}
         onLoaderFinished={() => setProgress(0)}
       />
-      <div className="flex rounded-b-3xl relative max-w-[2200px] m-auto px-[20px] w-full overflow-clip shadow-b-lg mb-12">
+      <div className="h-full flex rounded-b-3xl relative max-w-[2200px] m-auto px-[20px] w-full overflow-clip shadow-b-lg">
         {/* Sidebar */}
         <div className="z-0 h-[calc(100vh_-_60px)] mr-4 sticky top-0 pt-2 pb-4 hidden xl:block">
           <div className="w-[200px] flex flex-col h-full">
             <Sidebar />
           </div>
         </div>
+
         <main className="w-full h-full">
           <div className="flex justify-between items-center px-4 py-1">
             <button
               onClick={handleGoBack}
-              className="flex items-center gap-1 hover:bg-[#212121] px-2 py-1 rounded-md duration-300"
+              className="flex items-center gap-1 hover:bg-[#212121] p-2 rounded-md duration-300"
             >
               {" "}
               <MoveLeft width={25} />
@@ -383,7 +399,9 @@ function PostDetails() {
                     language={activeTab}
                     theme="vs-dark"
                     value={activeTab === "html" ? htmlCode : cssCode}
-                    onChange={activeTab === "html" ? handleHtmlChange : handleCssChange}
+                    onChange={
+                      activeTab === "html" ? handleHtmlChange : handleCssChange
+                    }
                     options={{
                       minimap: { enabled: false },
                       copyWithSyntaxHighlighting: true,
@@ -429,14 +447,104 @@ function PostDetails() {
                     )}
                     {post.saved} <p className="text-base">Save to favourites</p>
                   </button>
-                  
                 </div>
-                
               </div>
+            </div>
+          </div>
+
+          <div className="col-span-full grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 mt-10 px-4">
+            <div>
+              {/* <Comments post={post}/> */}
+              <Comments post={post} />
+              <div className="lg:max-w-2xl max-w-[70%] md:max-w-full mt-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="flex items-center gap-2 text-gray-400">
+                     <Scale width={25}/>
+                      MIT License
+                    </span>
+                  </div>
+                  <textarea
+                    name=""
+                    id=""
+                    cols="10"
+                    rows="5"
+                    className="w-full p-6 text-base text-gray-300 border-none resize-none bg-[#212121] custom-scrollbar rounded-xl"
+                    readOnly
+                    value={`Copyright - 2024 ${post.user.personal_info.fullname} (${post.user.personal_info.username}) \n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`}
+                  />
+                </div>
+            </div>
+            
+            <div>
+              <aside>
+                <div className="">
+                  <h2 className="mb-2 text-2xl font-bold text-gray-100 font-display capitalize max-w-[300px]">
+                    {category.slice(0, category.length - 1)}
+                  </h2>
+                  <div className="flex flex-wrap gap-y-0 gap-x-2 text-gray-300 max-w-[300px]">
+                    {tags.map((tag, index) => (
+                      <a
+                        key={index}
+                        className="hover:underline underline-offset-2"
+                        data-discover="true"
+                        href="/tags/gradient"
+                      >
+                        {tag}
+                      </a>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2"></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-4">
+                    <div className="flex items-center gap-3 font-normal text-gray-400">
+                      <Calendar />
+                      {getFullDay(publishedAt)}
+                    </div>
+                    <button onClick={() => setReportModal(true)} className="px-4 py-2.5 font-sans flex items-center gap-2 border-none rounded-lg text-base font-semibold transition-colors duration-300 bg-transparent hover:bg-[#212121] max-md:bg-[#212121] text-offwhite cursor-pointer group">
+                      <ShieldAlert className="text-red-500" />
+                      <span className="text-gray-400 group-hover:text-gray-200">
+                        Report
+                      </span>
+                    </button>
+                  </div>
+                  <div className="w-full h-[2px] bg-dark-500 mb-6 mt-4"></div>
+                </div>
+                <section className="rounded-xl md:pr-8 max-w-full md:w-[300px] xl:w-[350px] mb-6">
+                  <div className="grid grid-cols-[48px_1fr] gap-4 content-start">
+                    <Link
+                      to={`/profile/${username}`}
+                      className=""
+                      data-discover="true"
+                    >
+                      <img
+                        src={profile_img}
+                        alt={username}
+                        className="w-12 h-12 rounded-lg"
+                      />
+                    </Link>
+                    <div className="max-w-full overflow-hidden">
+                      <Link
+                        className="block text-xl font-semibold text-gray-200 truncate overflow-hidden"
+                        data-discover="true"
+                        to={`/profile/${username}`}
+                      >
+                        {username}
+                      </Link>
+                      <p className="block text-gray-400">{fullname}</p>
+                    </div>
+                    <p className="block text-gray-200 col-span-full text-base"></p>
+                  </div>
+                </section>
+              </aside>
             </div>
           </div>
         </main>
       </div>
+
+      {
+        reportModal && access_token && (
+          <ReportModal postId={postId} access_token={access_token} handleCloseBtn={handleCloseBtn}/>
+        )
+      }
     </AnimationWrapper>
   );
 }

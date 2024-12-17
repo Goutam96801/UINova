@@ -74,7 +74,7 @@ const PostCard = ({ post, user }) => {
     setProgress(70);
     setTimeout(() => {
         setProgress(100);
-        navigate(`/posts/${post.user.personal_info.username}/${post.postId}`)
+        navigate(`/${post.user.personal_info.username}/${post.postId}`)
     },500)
   };
 
@@ -82,18 +82,18 @@ const PostCard = ({ post, user }) => {
     <article
     className="relative isolate flex flex-col text-black h-full overflow-hidden rounded-md"
   >
-    <div onClick={handleLinkClick} className="relative min-h-[250px] cursor-pointer max-h-[520px] rounded-md overflow-hidden flex-grow">
+    <div className="relative min-h-[250px] cursor-pointer max-h-[520px] rounded-md overflow-hidden flex-grow">
     <article className="card duration-300 transition-all relative isolate flex flex-col text-black h-full overflow-hidden rounded-md">
-         <LoadingBar
-          color="red"
-          progress={progress}
-          onLoaderFinished={() => setProgress(0)}
-        />
+    <LoadingBar
+        color="#7781b7"
+        progress={progress}
+        onLoaderFinished={() => setProgress(0)}
+      />
       <div className={`relative min-h-[250px] max-h-[520px] rounded-md bg-[${post.theme === "dark" ? '#212121' : '#e8e8e8'}] overflow-hidden flex-grow`}>
         <div className=" h-full w-full flex justify-center items-center overflow-hidden">
           <div className={`relative  bg-${post.theme === 'dark' ? '#212121' : '#e8e8e8'} flex items-center justify-center cursor-pointer h-full`}></div>
           <div className="z-10" ref={previewRef} />
-          <button
+          <button onClick={handleLinkClick} 
             className={`card-btn absolute bottom-2 z-50 right-2 gap-1 text-[#e8e8e8] font-semibold px-2 py-1 rounded text-sm bg-[${post.theme==='light' ? '#212121' : '#a5a5a511'}]`}
           >
             <CodeXml /> Get Code
@@ -113,14 +113,14 @@ const PostCard = ({ post, user }) => {
         </Link>
       </div>
       <div className="flex items-center gap-1 whitespace-nowrap ml-auto text-[#848484] text-[14px] ">
-        <span>{post.views} views</span>
+        <span>{post.activity.total_views} views</span>
         <button className="flex hover:bg-dark-500 bg-transparent py-0.5 px-1 text-sm gap-0.5 text-gray-300 cursor-pointer transition-colors  font-sans font-semibold border-none items-center overflow-hidden rounded-md hover:bg-[#303030]" onClick={toggleSave}>
         {loading ? (
               <ClipLoader size={15}/>
             ) : (
               isSaved ? <BookMarked className="w-4 h-4 text-yellow-500" /> : <Bookmark className="w-4 h-4" />
             )}
-            {post.saved}
+            {post.activity.total_saves}
         </button>
       </div>
     </div>

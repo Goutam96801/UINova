@@ -7,11 +7,6 @@ const commentSchema = mongoose.Schema({
         required: true,
         ref: 'posts'
     },
-    post_author: {
-        type: Schema.Types.ObjectId,
-        required: true,
-        ref: 'posts',
-    },
     comment: {
         type: String,
         required: true
@@ -27,6 +22,7 @@ const commentSchema = mongoose.Schema({
     },
     isReply: {
         type: Boolean,
+        default: false
     },
     parent: {
         type: Schema.Types.ObjectId,

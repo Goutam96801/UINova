@@ -82,7 +82,7 @@ function Sidebar() {
   },[result])
 
   return (
-    <div className="flex h-[100vh] fixed overflow-hidden">
+    <div className="flex h-[100vh] fixed overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
          <LoadingBar
         color="red"
         progress={progress}
@@ -91,7 +91,7 @@ function Sidebar() {
       {(isSidebarOpen || !isMobile) && (
         <aside
           ref={sidebarRef}
-          className={`w-[250px] bg-dark-700 border-r border-gray-600 py-6 px-2 shadow-2xl  ${
+          className={`w-[250px] bg-gradient-to-br from-gray-900 to-gray-800 border-r border-gray-600 py-6 px-2 shadow-2xl  ${
             isMobile ? " absolute top-0 left-0 h-[100%] z-50 " : ""
           }`}
         >
@@ -104,8 +104,8 @@ function Sidebar() {
                 <Link onClick={() => {
                   handleLinkClick(name)
                   if (isMobile) setIsSidebarOpen(false);
-                }} key={name} className={`mb-[10px] flex px-6 py-2 rounded-md gap-4 cursor-pointer bg-transparent duration-300  ${
-                    activeNavItem === name ? " bg-[#2c2c2c] font-semi-bold " : "hover:bg-[#a5a5a511]"
+                }} key={name} className={`mb-[10px] flex px-6 py-2 rounded-md gap-4 cursor-pointer duration-300  ${
+                    activeNavItem === name ? " bg-[#a5a5a511] font-semi-bold " : "hover:bg-[#a5a5a511]"
                   }`}>
                     {IconComp && <IconComp className="w-8 h-8" />}
                   <p

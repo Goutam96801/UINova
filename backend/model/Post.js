@@ -36,18 +36,32 @@ const postSchema = mongoose.Schema({
         enum: ['draft', 'under review', 'published', 'rejected'],
         default: 'draft'
     },
-    saved: {
+
+    activity:{
+        
+    total_saves: {
         type: Number,
         default: 0
     },
-    views: {
+    total_views: {
         type: Number,
         default: 0
     },
+    total_comments:{
+        type: Number,
+        default: 0
+    },
+    total_parent_comments:{
+        type: Number,
+        default: 0
+    }
+    },
+    
     reports: [
         {
             user: { type: Schema.Types.ObjectId, ref: 'users' }, // Reference to the user who reported
             message: { type: String, required: true }, // Report reason/message
+            additionalMessage:{type: String},
             createdAt: { type: Date, default: Date.now }
         }
     ],
@@ -56,6 +70,11 @@ const postSchema = mongoose.Schema({
         ref: 'users',
         default: [],
         unique: true
+    },
+
+    comments: {
+        type: [Schema.Types.ObjectId],
+        ref: 'comments'
     },
 },
     {
